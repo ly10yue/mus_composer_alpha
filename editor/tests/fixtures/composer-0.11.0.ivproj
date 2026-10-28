@@ -1,0 +1,154 @@
+{
+  "format": "interval-project",
+  "version": 5,
+  "document": {
+    "title": "Untitled",
+    "artist": "",
+    "difficulty": "CUSTOM",
+    "bpm": 120.0,
+    "meter": 4,
+    "offset": 0.0,
+    "duration": 150.750667,
+    "audio": "music.ogg",
+    "division": 4,
+    "grid_unit": "beat",
+    "notes": [
+      {
+        "id": 0,
+        "beat": 1.0,
+        "line": "line1",
+        "length": 0.0
+      },
+      {
+        "id": 1,
+        "beat": 2.0,
+        "line": "line1",
+        "length": 1
+      }
+    ],
+    "regions": [
+      {
+        "start": 0.0,
+        "end": 307.5,
+        "label": "\u5168\u57df",
+        "rects": [
+          [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        ],
+        "events": [
+          {
+            "center": [
+              {
+                "start": 1.0,
+                "end": 4.0,
+                "from": [
+                  0.5,
+                  0.7
+                ],
+                "to": [
+                  0.5,
+                  0.3
+                ],
+                "ease": "sine_in_out"
+              }
+            ],
+            "angle": [
+              {
+                "start": 1.0,
+                "end": 4.0,
+                "from": 0.0,
+                "to": 90.0,
+                "ease": "sine_in_out"
+              }
+            ],
+            "width": [
+              {
+                "start": 1.0,
+                "end": 4.0,
+                "from": 0.8,
+                "to": 0.6,
+                "ease": "sine_in_out"
+              }
+            ],
+            "height": [
+              {
+                "start": 1.0,
+                "end": 4.0,
+                "from": 0.8,
+                "to": 0.6,
+                "ease": "sine_in_out"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "start": 307.5,
+        "end": 307.501334,
+        "label": "\u5168\u57df",
+        "rects": [
+          [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        ]
+      }
+    ],
+    "lines": [
+      {
+        "id": "line1",
+        "name": "\u8f68\u8ff9 1",
+        "frames": [
+          {
+            "beat": 0.0,
+            "x": 0.5,
+            "alpha": 1.0,
+            "ease": "linear"
+          }
+        ]
+      },
+      {
+        "id": "line2",
+        "name": "\u8f68\u8ff9 2",
+        "frames": [
+          {
+            "beat": 0.0,
+            "x": 0.39,
+            "alpha": 1.0,
+            "ease": "linear"
+          }
+        ]
+      },
+      {
+        "id": "line3",
+        "name": "\u8f68\u8ff9 3",
+        "frames": [
+          {
+            "beat": 0.0,
+            "x": 0.61,
+            "alpha": 1.0,
+            "ease": "linear"
+          }
+        ]
+      },
+      {
+        "id": "line4",
+        "name": "\u8f68\u8ff9 4",
+        "frames": [
+          {
+            "beat": 0.0,
+            "x": 0.82,
+            "alpha": 1.0,
+            "ease": "linear"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+build/
+.gradle/
+local.properties
+*.jks
+.tools/
+dist/
+__pycache__/
+*.pyc
+*.ivproj.tmp
+
+.release-repos/
+*.log
+editor/agent-config.json
+.env*

@@ -1,0 +1,66 @@
+{
+  "version": "0.12.0",
+  "unitTests": 70,
+  "uiChecks": 23,
+  "androidRegionChecks": {
+    "16:9": 264,
+    "4:3": 264
+  },
+  "androidTrackChecks": 1460,
+  "androidFlowChecks": 5890,
+  "frozen": {
+    "regions": {
+      "ok": true,
+      "frozen": true,
+      "lanes": [
+        "center",
+        "angle",
+        "width",
+        "height"
+      ],
+      "format": 6,
+      "exactPaste": true,
+      "batchUndo": true
+    },
+    "tracks": {
+      "ok": true,
+      "frozen": true,
+      "lanes": 4,
+      "notes": 2,
+      "format": 6,
+      "defaults": [
+        0.5,
+        0.0,
+        1.0
+      ]
+    },
+    "agent": {
+      "ok": true,
+      "agent": true,
+      "notes": 622,
+      "lines": 4,
+      "format": 6,
+      "audioLoaded": true,
+      "decodedWaveBins": 7538,
+      "hitSoundsReady": true,
+      "hitSoundsPlayed": 2,
+      "showcaseAvailable": true,
+      "frozen": true
+    },
+    "agent-settings": {
+      "ok": true,
+      "frozen": true,
+      "model": "qoder-deepseek-flash",
+      "key_filled": true,
+      "key_masked": true
+    },
+    "audio": {
+      "ok": true,
+      "frozen": true,
+      "duration": 6.0,
+      "beat": 2.383583711116317,
+      "hitSoundsPlayed": 1,
+      "error": ""
+    }
+  }
+}

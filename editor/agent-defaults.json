@@ -1,0 +1,9 @@
+{
+  "base_url": "http://127.0.0.1:8646/v1",
+  "model": "qoder-deepseek-flash",
+  "timeout": 120,
+  "max_rounds": 8,
+  "strict": true,
+  "default_key_file": "~/Desktop/Qoder-Bridge-main/.runtime/bridge-key",
+  "default_key_endpoint": "http://127.0.0.1:8646/v1/chat/completions"
+}

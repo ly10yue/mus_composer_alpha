@@ -1,0 +1,28 @@
+{
+  "ok": true,
+  "checks": [
+    "Ctrl near top advances timeline",
+    "marquee anchor stays at original musical time",
+    "Ctrl below bottom reverses timeline",
+    "release stops panning",
+    "direct region entry",
+    "new full-screen region defaults",
+    "0–100 input conversion",
+    "Ctrl near top advances timeline",
+    "marquee anchor stays at original musical time",
+    "Ctrl below bottom reverses timeline",
+    "release stops panning",
+    "delete region",
+    "undo restores region and name",
+    "one-step direct commit",
+    "selected region becomes Agent target",
+    "whole dialog undo",
+    "line 0–100 UI",
+    "Ctrl near top advances timeline",
+    "marquee anchor stays at original musical time",
+    "Ctrl below bottom reverses timeline",
+    "release stops panning",
+    "overlap interior has no drawn edge",
+    "outer boundary remains visible"
+  ]
+}

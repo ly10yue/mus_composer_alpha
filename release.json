@@ -1,0 +1,8 @@
+{
+  "appVersion": "0.12.0",
+  "formatVersion": 6,
+  "coordinateScale": 100,
+  "minReaderVersion": "0.12.0",
+  "compatibilityBaseline": "Composer 0.11.0",
+  "androidVersionCode": 12
+}
