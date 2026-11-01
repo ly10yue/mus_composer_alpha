@@ -169,6 +169,13 @@ class Document:
         self.regions[-1].end = end
         self.regions = [r for r in self.regions if r.start < r.end]
 
+    def time_location(self, beat):
+        if not math.isfinite(beat):return "无效时间点"
+        milliseconds=round((self.seconds(beat)+self.offset)*1000)
+        sign="−" if milliseconds<0 else ""
+        minutes,remainder=divmod(abs(milliseconds),60000);seconds,millis=divmod(remainder,1000)
+        return f"{sign}{minutes:02d}:{seconds:02d}.{millis:03d}（第 {beat:g} 拍）"
+
     def validate(self):
         errors, warnings = [], []
         if not self.audio or not Path(self.audio).is_file():
@@ -194,37 +201,34 @@ class Document:
         sorted_notes = sorted(self.notes, key=lambda n: n.beat)
         for i, n in enumerate(sorted_notes):
             if not all(math.isfinite(v) for v in (n.beat, n.length)) or not 0<=n.beat<=600000 or not 0<=n.length<=600000 or n.line not in {t.id for t in self.lines}:
-                errors.append(f'音符 {n.id} 数据无效。')
+                errors.append(f'{self.time_location(n.beat)} 的音符数据无效。')
                 continue
             start, end = self.seconds(n.beat) + self.offset, self.seconds(n.beat+n.length) + self.offset
             if start < 0 or end > self.duration:
-                errors.append(f'音符 {n.id} 超出歌曲时长（第 {n.beat:g} 拍）。');continue
+                errors.append(f'{self.time_location(n.beat)} 的音符超出歌曲时长。');continue
             region = self.region_at(n.beat)
             if region is None or not all(reachable(region,n.beat,self.note_x(n),aspect) for aspect in ASPECTS):
-                errors.append(f'音符 {n.id} 在 16:9 或 4:3 下不在开放区域的横向范围内。')
+                errors.append(f'{self.time_location(n.beat)} 的音符在 16:9 或 4:3 下不在开放区域的横向范围内。')
             if n.length:
                 if len(self.track(n.line).frames)>1:
-                    warnings.append(f'Hold {n.id} 随轨迹弯折并竖直下落，持续判定时请跟随下方交点。')
+                    warnings.append(f'{self.time_location(n.beat)} 起的 Hold 随轨迹弯折并竖直下落，持续判定时请跟随下方交点。')
                 samples=min(4096,max(2,math.ceil(n.length*8)))
                 times={n.beat+n.length*j/samples for j in range(1,samples+1)}
                 times.update(r.start for r in self.regions if n.beat<r.start<n.beat+n.length)
                 for at in sorted(times):
                     r=self.region_at(at)
                     if r is None or not all(reachable(r,at,self.note_x(n,arrival=at),a) for a in ASPECTS):
-                        errors.append(f'Hold {n.id} 的轨迹在第 {at:g} 拍离开开放区域。');break
+                        errors.append(f'{self.time_location(n.beat)} 起的 Hold 在 {self.time_location(at)} 离开开放区域。');break
             if n.length and any(any(r.motions) for r in self.regions if r.end>n.beat and r.start<n.beat+n.length):
-                warnings.append(f'Hold {n.id} 经过运动区域，请检查移动过程及持续可触及性。')
+                warnings.append(f'{self.time_location(n.beat)} 起的 Hold 经过运动区域，请检查移动过程及持续可触及性。')
             if n.length and any(n.beat < r.start < n.beat+n.length for r in self.regions):
-                warnings.append(f'Hold {n.id} 跨越区域切换，请检查能否持续按住。')
+                warnings.append(f'{self.time_location(n.beat)} 起的 Hold 跨越区域切换，请检查能否持续按住。')
             for p in sorted_notes[i+1:]:
                 if (n.length and p.beat >= n.beat+n.length-1e-7) or p.beat > n.beat + max(n.length, .0001):
                     break
                 if p.line not in {t.id for t in self.lines}:continue
                 if abs(self.note_x(p)-self.note_x(n,arrival=p.beat)) < .085:
-                    errors.append(f'音符 {n.id} 与 {p.id} 同列重叠。')
-            active = sum(p.beat <= n.beat < p.beat + max(p.length, .00001) for p in sorted_notes)
-            if active > 2:
-                warnings.append(f'第 {n.beat:g} 拍需要超过两根手指。')
+                    warnings.append(f'{self.time_location(n.beat)} 与 {self.time_location(p.beat)} 的音符同列重叠。')
         return list(dict.fromkeys(errors)), list(dict.fromkeys(warnings))
 
     def format_version(self):return 5 if any(any(r.events) for r in self.regions) else 4 if any(t.events for t in self.lines) else 3

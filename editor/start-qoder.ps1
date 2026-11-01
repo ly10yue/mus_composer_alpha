@@ -7,6 +7,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $projectDirectory = Split-Path $PSScriptRoot -Parent
 $editorExe = Join-Path $projectDirectory 'dist\editor-0.12.0\IntervalComposer\IntervalComposer.exe'
+$checkFixExe = Join-Path $projectDirectory 'dist\editor-0.12.0-checkfix\IntervalComposer\IntervalComposer.exe'
+if (Test-Path -LiteralPath $checkFixExe -PathType Leaf) { $editorExe = $checkFixExe }
 $bridgeKeyPath = Join-Path $BridgeDirectory '.runtime\bridge-key'
 $baseUrl = "http://127.0.0.1:$Port/v1"
 if (!(Test-Path -LiteralPath $editorExe -PathType Leaf)) { throw 'Editor executable not found. Build editor-0.12.0 first.' }

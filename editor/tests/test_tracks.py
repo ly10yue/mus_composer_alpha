@@ -57,6 +57,6 @@ class TrackTests(unittest.TestCase):
         d=Document(audio=__file__);d.lines[0].frames=[key(0,.18),key(4,.8)]
         d.add(1,'line1',3);n=d.add(3,'line2');x=d.note_x(d.notes[0],arrival=3)
         d.track('line2').frames=[key(0,x)]
-        self.assertTrue(any('重叠' in e for e in d.validate()[0]))
+        self.assertFalse(any('重叠' in e for e in d.validate()[0]));self.assertTrue(any('重叠' in e for e in d.validate()[1]))
 
 if __name__=='__main__':unittest.main()

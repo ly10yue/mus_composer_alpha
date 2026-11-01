@@ -453,7 +453,7 @@ class Editor(QMainWindow):
     def validate(self):
         errors,warnings=self.doc.validate();text=f'{len(self.doc.notes)} 个音符 · {len(self.doc.regions)} 个区域段\n\n'
         text+='错误：\n'+'\n'.join(errors[:30]) if errors else '✓ 没有阻止导出的错误。'
-        if warnings:text+='\n\n提示：\n'+'\n'.join(warnings[:20])
+        if warnings:text+='\n\n警告（不影响导出）：\n'+'\n'.join(warnings[:20])
         self.message('谱面检查',text)
     def export_ready(self):
         if self.hit_audio.preparing or self.hit_audio.audio_error:
@@ -461,7 +461,7 @@ class Editor(QMainWindow):
         if self.region_dirty:self.message('区域尚未应用','请先应用区域草稿，或选择其他段落放弃草稿，再导出。');return False
         errors,warnings=self.doc.validate()
         if errors:self.message('请先修正谱面','\n'.join(errors[:20]));return False
-        if warnings and QMessageBox.question(self,'导出提示','\n'.join(warnings[:12])+'\n\n仍然导出？')!=QMessageBox.StandardButton.Yes:return False
+        if warnings:self.statusBar().showMessage(f'检查发现 {len(warnings)} 项警告，不影响导出；可在“谱面检查”中查看时间点。',8000)
         return True
     def export_json(self):
         if not self.export_ready():return
