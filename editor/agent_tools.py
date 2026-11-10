@@ -11,7 +11,7 @@ from motion import validate_motions
 from curves import validate_events,EASES
 from region_events import validate_channel
 import agent_units
-from versioning import APP_VERSION
+from versioning import APP_VERSION,display_range
 
 def obj(**properties):return dict(type='object',properties=properties,required=list(properties),additionalProperties=False)
 def num(low=-600000,high=600000):return dict(type='number',minimum=low,maximum=high)
@@ -19,12 +19,13 @@ def integer(low=0,high=20000):return dict(type='integer',minimum=low,maximum=hig
 def array(items,maximum,minimum=0):return dict(type='array',items=items,minItems=minimum,maxItems=maximum)
 def string(maximum=120):return dict(type='string',maxLength=maximum)
 BEAT=num(0,600000);EASE=dict(type='string',enum=['linear','smooth','hold'])
-RECT=array(num(0,100),4,4)
-AREA_KEY=obj(beat=BEAT,x=num(-200,200),y=num(-200,200),angle=num(-36000,36000),ease=EASE)
-LINE_KEY=obj(beat=BEAT,x=num(0,100),alpha=num(0,1),ease=EASE)
+POSITION=num(*display_range('x'))
+RECT=array(POSITION,4,4)
+AREA_KEY=obj(beat=BEAT,x=POSITION,y=POSITION,angle=num(-36000,36000),ease=EASE)
+LINE_KEY=obj(beat=BEAT,x=POSITION,alpha=num(0,1),ease=EASE)
 EVENT_EASE=dict(type='string',enum=list(EASES))
 EVENT=obj(start=BEAT,end=BEAT,**{'from':num(-36000,36000),'to':num(-36000,36000)},ease=EVENT_EASE)
-CENTER_EVENT=obj(start=BEAT,end=BEAT,**{'from':array(num(-200,300),2,2),'to':array(num(-200,300),2,2)},ease=EVENT_EASE)
+CENTER_EVENT=obj(start=BEAT,end=BEAT,**{'from':array(POSITION,2,2),'to':array(POSITION,2,2)},ease=EVENT_EASE)
 LINE_ID=dict(type='string',pattern=r'^[A-Za-z0-9_-]{1,64}$',maxLength=64)
 NOTE_ID=dict(type=['integer','null'],minimum=0,maximum=1000000000)
 
@@ -40,10 +41,10 @@ TOOLS=[
     tool('set_region','显式替换 [start_beat,end_beat) 内的整组矩形和运动；范围外内容保留。motions=[] 表示全静态，否则与 rects 对应。谨慎使用，区间内旧内容会被替换。',
          obj(start_beat=BEAT,end_beat=BEAT,label=string(80),rects=array(RECT,32),motions=array(array(AREA_KEY,256),32))),
     tool('set_track','新增轨迹或替换指定轨迹的全部关键帧。现有音符绑定 ID 不变。只支持横向位置和线透明度。',obj(line_id=LINE_ID,name=string(80),frames=array(LINE_KEY,256,1))),
-    tool('set_track_events','替换指定轨迹的一栏时间条，其他栏和绑定音符保留。先 get_track 保留该栏未修改的条目。x 为 0–100，alpha 为 0–1，speed 为 0–8；events=[] 固定初始值。',obj(line_id=LINE_ID,channel=dict(type='string',enum=['x','alpha','speed']),events=array(EVENT,256))),
+    tool('set_track_events','替换指定轨迹的一栏时间条，其他栏和绑定音符保留。先 get_track 保留该栏未修改的条目。x 为 ±1000（可视范围 0–100），alpha 为 0–1，speed 为 0–8；events=[] 固定初始值。',obj(line_id=LINE_ID,channel=dict(type='string',enum=['x','alpha','speed']),events=array(EVENT,256))),
     tool('delete_track','删除无音符绑定的线。至少保留一条线，且仅在用户要求删除时调用。',obj(line_id=LINE_ID)),
     tool('set_region_center','替换某矩形的中心点栏时间条；from/to 为绝对 [X,Y]。先 get_region 读取并保留未修改的时间条，其他栏不变。',obj(region_index=integer(0,4999),rect_index=integer(0,31),events=array(CENTER_EVENT,256))),
-    tool('set_region_events','替换某矩形的一栏时间条，其他栏不变。angle 是顺时针度数 ±36000；width/height 为总长/总宽 0.1–400（全屏为 100）。先 get_region 保留未修改条目。',obj(region_index=integer(0,4999),rect_index=integer(0,31),channel=dict(type='string',enum=['angle','width','height']),events=array(EVENT,256))),
+    tool('set_region_events','替换某矩形的一栏时间条，其他栏不变。angle 是顺时针度数 ±36000；width/height 为总长/总宽 0–1000（全屏为 100，任一边为 0 时隐藏且不可判定）。先 get_region 保留未修改条目。',obj(region_index=integer(0,4999),rect_index=integer(0,31),channel=dict(type='string',enum=['angle','width','height']),events=array(EVENT,256))),
     tool('edit_notes','批量新建或修改音符：id=null 新建，否则修改已有 ID；length=0 为 Tap，>0 为 Hold。拍数精确保存，不自动吸附网格。',
          obj(notes=array(obj(id=NOTE_ID,beat=BEAT,line=LINE_ID,length=BEAT),1000,1))),
     tool('delete_notes','删除明确指定的已有音符 ID；只有用户要求删除时调用。',obj(ids=array(integer(0,1000000000),1000,1))),

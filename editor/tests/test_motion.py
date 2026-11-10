@@ -40,7 +40,7 @@ class MotionTests(unittest.TestCase):
         d.retime(240,False);self.assertEqual(d.regions[0].motions[0][1]['beat'],16);self.assertEqual(d.chart()['sections'][0]['motions'][0][1]['time'],4)
         d.retime(120,True);self.assertEqual(d.regions[0].motions[0][1]['beat'],16)
     def test_invalid_motion_rejected(self):
-        for frames in ([key(-.5)],[key(0),key(0)],[key(0,x=3)],[key(0,angle=float('nan'))],[key(0,ease='unknown')]):
+        for frames in ([key(-.5)],[key(0),key(0)],[key(0,x=11)],[key(0,angle=float('nan'))],[key(0,ease='unknown')]):
             with self.assertRaises(ValueError):validate_motions([frames],1)
         with self.assertRaises(ValueError):validate_motions([[],[]],1)
         with self.assertRaises(ValueError):validate_motions([[key(i) for i in range(257)]],1)

@@ -2,6 +2,7 @@
 import copy
 from PySide6.QtCore import Qt,QTimer
 from PySide6.QtWidgets import QDialog,QVBoxLayout,QHBoxLayout,QFormLayout,QLabel,QPushButton,QDoubleSpinBox,QComboBox,QTreeWidget,QTreeWidgetItem,QDialogButtonBox,QMessageBox
+from versioning import POSITION_LIMIT
 from motion import pose,validate_motions,EASINGS
 from views import Stage
 from numeric import NumberBox,sync_number
@@ -13,7 +14,7 @@ class MotionDialog(QDialog):
         layout=QVBoxLayout(self);columns=QHBoxLayout();layout.addLayout(columns,1);left=QVBoxLayout();right=QVBoxLayout();columns.addLayout(left,1);columns.addLayout(right,1)
         hint=QLabel('位移相对原始矩形中心，正 X 向右、正 Y 向下。\n角度正值顺时针；缓动作用于本帧到下一帧。');hint.setWordWrap(True);left.addWidget(hint)
         self.keys=QTreeWidget();self.keys.setHeaderLabels(['拍','X / Y','角度','缓动']);self.keys.setRootIsDecorated(False);self.keys.itemClicked.connect(self.select_key);left.addWidget(self.keys,1)
-        form=QFormLayout();self.beat=self.number(0,600000,4,editor.doc.step);self.x=self.number(-2,2,4,.05);self.y=self.number(-2,2,4,.05);self.angle=self.number(-36000,36000,2,15)
+        form=QFormLayout();self.beat=self.number(0,600000,4,editor.doc.step);self.x=self.number(-POSITION_LIMIT,POSITION_LIMIT,4,.05);self.y=self.number(-POSITION_LIMIT,POSITION_LIMIT,4,.05);self.angle=self.number(-36000,36000,2,15)
         self.ease=QComboBox();self.ease.addItems(['匀速','平滑','保持 / 瞬移'])
         for label,widget in [('拍位置',self.beat),('横向位移 X',self.x),('纵向位移 Y',self.y),('旋转角度 °',self.angle),('到下一帧',self.ease)]:form.addRow(label,widget)
         left.addLayout(form)

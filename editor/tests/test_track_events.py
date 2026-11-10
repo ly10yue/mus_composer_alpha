@@ -46,7 +46,7 @@ class TrackEventTests(unittest.TestCase):
         self.assertEqual(d.chart()['lines'][0]['events'],original)
         self.assertAlmostEqual(d.lines[0].distance(4,12),2*distance)
     def test_invalid_overlaps_ranges_and_eases(self):
-        for events in [[segment(0,0,0,1)],[segment(0,2,0,1),segment(1,3,0,1)],[segment(0,2,-.1,1)],[segment(0,2,0,float('nan'))],[segment(0,2,0,1,'bad')]]:
+        for events in [[segment(0,0,0,1)],[segment(0,2,0,1),segment(1,3,0,1)],[segment(0,2,-10.1,1)],[segment(0,2,0,float('nan'))],[segment(0,2,0,1,'bad')]]:
             with self.assertRaises(ValueError):validate_events(events,'x')
         with self.assertRaises(ValueError):validate_events([segment(0,1,1,9)],'speed')
         t=track();t.events={'unknown':[]}

@@ -45,4 +45,17 @@ def decode(data,project=False):
     elif data.get('coordinateScale',1)!=1:raise ValueError('旧格式必须使用 0–1 坐标，不能按数值大小猜测单位')
     return data
 
+# Limits are normalized internally; 1 is one full playfield dimension.
+POSITION_LIMIT = 10
+VALUE_RANGES = {
+    'x': (-POSITION_LIMIT, POSITION_LIMIT), 'center': (-POSITION_LIMIT, POSITION_LIMIT),
+    'width': (0, POSITION_LIMIT), 'height': (0, POSITION_LIMIT),
+    'angle': (-36000, 36000), 'alpha': (0, 1), 'speed': (0, 8),
+}
+
+def display_range(prop):
+    lo, hi = VALUE_RANGES[prop]
+    factor = display_factor(prop)
+    return lo * factor, hi * factor
+
 def display_factor(prop):return 100 if prop in ('x','center','width','height') else 1

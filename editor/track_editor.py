@@ -11,7 +11,7 @@ from numeric import NumberBox,sync_number
 from views import Stage
 from track_view import TrackTimeline
 from timeline_edit import BatchTimelineEdits
-from versioning import display_factor,APP_VERSION
+from versioning import display_range,display_factor,APP_VERSION
 
 PROPS=('notes','x','alpha','speed')
 LABELS=('绑定音符','横向位置','线透明度','音符流速')
@@ -128,7 +128,7 @@ class TrackDialog(BatchTimelineEdits,QDialog):
         self.start.setValue(item.beat if prop=='notes' else item['start']);self.end.setValue(item.beat+item.length if prop=='notes' else item['end'])
         for widget in (self.value_from,self.value_to,self.ease):widget.setEnabled(prop!='notes')
         if prop!='notes':
-            for widget in (self.value_from,self.value_to):widget.setMaximum(8 if prop=='speed' else 100 if prop=='x' else 1);widget.setSingleStep(.1 if prop=='speed' else 1 if prop=='x' else .01)
+            for widget in (self.value_from,self.value_to):widget.setRange(*display_range(prop));widget.setSingleStep(.1 if prop=='speed' else 1 if prop=='x' else .01)
             self.value_from.setValue(item['from']*display_factor(prop));self.value_to.setValue(item['to']*display_factor(prop));self.ease.setCurrentIndex(EASES.index(item.get('ease','linear')))
         self._inspector_state=self.inspector_values()
         self.timeline.viewport().update()

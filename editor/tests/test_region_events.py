@@ -22,6 +22,16 @@ class RegionEventTests(unittest.TestCase):
         self.assertEqual(d.chart()['version'],6);self.assertEqual(Document.from_project(d.project()).project(),d.project())
         d.set_region(8,12,[[0,0,1,1]],'other');self.assertEqual(d.regions[0].events,d.regions[2].events)
         before=d.regions[0].events[0]['center'][0]['start'];d.retime(240,False);self.assertEqual(d.regions[0].events[0]['center'][0]['start'],before*2)
+    def test_hide_then_restore(self):
+        for prop in ('width','height'):
+            channels={prop:[event(0,1,1,0),event(2,3,0,1)],'angle':[event(0,3,45,45)]}
+            for aspect in (1.17,1.62):
+                rect=[0,0,1,1]
+                for beat in (1,1.5,2):
+                    self.assertEqual(polygon(rect,[],beat,aspect,channels),[])
+                    self.assertIsNone(touch_y(rect,[],beat,aspect,.5,channels))
+                self.assertIsNotNone(touch_y(rect,[],3,aspect,.5,channels))
+
     def test_legacy_channel_conversion(self):
         frames=[dict(beat=2,x=.1,y=-.1,angle=45,ease='smooth'),dict(beat=8,x=.2,y=.3,angle=90,ease='linear')]
         adapter=RegionChannels([.1,.2,.5,.8],frames,{})
@@ -32,7 +42,7 @@ class RegionEventTests(unittest.TestCase):
             for a,b in zip(original,actual):
                 for x,y in zip(a,b):self.assertAlmostEqual(x,y)
     def test_validation(self):
-        for prop,items in [('center',[event(a=[0],b=[1,1])]),('width',[event(a=0)]),('angle',[event(b=36001)]),('height',[event(),event(3,8)]),('center',[event(a=[True,0],b=[1,1])])]:
+        for prop,items in [('center',[event(a=[0],b=[1,1])]),('width',[event(a=-.001)]),('angle',[event(b=36001)]),('height',[event(),event(3,8)]),('center',[event(a=[True,0],b=[1,1])])]:
             with self.assertRaises(ValueError):validate_channel(items,prop)
         d=Document();d.regions[0].events=[dict(width=[event()])];p=d.project();p['version']=4
         with self.assertRaises(ValueError):Document.from_project(p)

@@ -164,8 +164,8 @@
             "type": "array",
             "items": {
               "type": "number",
-              "minimum": 0,
-              "maximum": 100
+              "minimum": -1000,
+              "maximum": 1000
             },
             "minItems": 4,
             "maxItems": 4
@@ -174,8 +174,8 @@
             "type": "array",
             "items": {
               "type": "number",
-              "minimum": 0,
-              "maximum": 100
+              "minimum": -1000,
+              "maximum": 1000
             },
             "minItems": 4,
             "maxItems": 4
@@ -243,8 +243,8 @@
               "type": "array",
               "items": {
                 "type": "number",
-                "minimum": 0,
-                "maximum": 100
+                "minimum": -1000,
+                "maximum": 1000
               },
               "minItems": 4,
               "maxItems": 4
@@ -266,13 +266,13 @@
                   },
                   "x": {
                     "type": "number",
-                    "minimum": -200,
-                    "maximum": 200
+                    "minimum": -1000,
+                    "maximum": 1000
                   },
                   "y": {
                     "type": "number",
-                    "minimum": -200,
-                    "maximum": 200
+                    "minimum": -1000,
+                    "maximum": 1000
                   },
                   "angle": {
                     "type": "number",
@@ -345,8 +345,8 @@
                 },
                 "x": {
                   "type": "number",
-                  "minimum": 0,
-                  "maximum": 100
+                  "minimum": -1000,
+                  "maximum": 1000
                 },
                 "alpha": {
                   "type": "number",
@@ -387,7 +387,7 @@
     "type": "function",
     "function": {
       "name": "set_track_events",
-      "description": "替换指定轨迹的一栏时间条，其他栏和绑定音符保留。先 get_track 保留该栏未修改的条目。x 为 0–100，alpha 为 0–1，speed 为 0–8；events=[] 固定初始值。",
+      "description": "替换指定轨迹的一栏时间条，其他栏和绑定音符保留。先 get_track 保留该栏未修改的条目。x 为 ±1000（可视范围 0–100），alpha 为 0–1，speed 为 0–8；events=[] 固定初始值。",
       "strict": true,
       "parameters": {
         "type": "object",
@@ -524,8 +524,8 @@
                   "type": "array",
                   "items": {
                     "type": "number",
-                    "minimum": -200,
-                    "maximum": 300
+                    "minimum": -1000,
+                    "maximum": 1000
                   },
                   "minItems": 2,
                   "maxItems": 2
@@ -534,8 +534,8 @@
                   "type": "array",
                   "items": {
                     "type": "number",
-                    "minimum": -200,
-                    "maximum": 300
+                    "minimum": -1000,
+                    "maximum": 1000
                   },
                   "minItems": 2,
                   "maxItems": 2
@@ -578,7 +578,7 @@
     "type": "function",
     "function": {
       "name": "set_region_events",
-      "description": "替换某矩形的一栏时间条，其他栏不变。angle 是顺时针度数 ±36000；width/height 为总长/总宽 0.1–400（全屏为 100）。先 get_region 保留未修改条目。",
+      "description": "替换某矩形的一栏时间条，其他栏不变。angle 是顺时针度数 ±36000；width/height 为总长/总宽 0–1000（全屏为 100，任一边为 0 时隐藏且不可判定）。先 get_region 保留未修改条目。",
       "strict": true,
       "parameters": {
         "type": "object",

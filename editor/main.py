@@ -19,13 +19,15 @@ from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 
 from model import Document, History, Note, FULL, DIVISIONS, atomic_json, export_package, import_package, validate_rects
 from views import Timeline, Stage
+from recovery import RecoveryWriter
 from motion import validate_motions
 from motion_dialog import MotionDialog
 from region_editor import RegionDialog
-from versioning import APP_VERSION,scale_spatial
+from versioning import display_range,APP_VERSION,scale_spatial
 from region_events import validate_region_events
 from timeline_edit import write_clipboard,read_clipboard,shifted_items,append_notes
 from dataclasses import asdict
+from shared_lanes import SharedLanes
 from track_editor import TrackDialog
 from agent_panel import AgentPanel
 from audio import Waveform
@@ -70,6 +72,13 @@ def new_document():return Document(lines=[Track('line1','轨迹 1',[dict(beat=0.
 
 class Editor(QMainWindow):
     frameRendered=Signal()
+
+    @property
+    def dirty(self):return self._dirty
+    @dirty.setter
+    def dirty(self,value):
+        self._dirty=value
+        if value:self._edit_serial=getattr(self,'_edit_serial',0)+1
     def __init__(self, recovery=True):
         super().__init__();self.setWindowTitle('INTERVAL Composer · 制谱器');self.setMinimumSize(1024,640)
         available=QApplication.primaryScreen().availableGeometry();self.resize(max(1024,min(1440,available.width()-40)),max(640,min(940,available.height()-60)))
@@ -94,7 +103,9 @@ class Editor(QMainWindow):
         self.hit_audio=ComposerHits(self)
         self.build_ui();self.build_shortcuts()
         self.render_timer=QTimer(self);self.render_timer.setTimerType(Qt.TimerType.PreciseTimer);self.render_timer.timeout.connect(self.render_frame);self.render_timer.start(16)
-        self.autosave_timer=QTimer(self);self.autosave_timer.timeout.connect(self.autosave);self.autosave_timer.start(20000)
+        self.recovery_writer=RecoveryWriter(self)
+        self.recovery_writer.message.connect(lambda message:self.statusBar().showMessage(message,5000))
+        self.autosave_timer=QTimer(self);self.autosave_timer.timeout.connect(lambda:self.autosave(background=True));self.autosave_timer.start(20000)
         self.sync()
         if recovery and self.recovery_path.exists():QTimer.singleShot(0,self.offer_recovery)
 
@@ -104,7 +115,7 @@ class Editor(QMainWindow):
         b=QPushButton(label);b.setProperty('primary',primary);b.clicked.connect(callback);layout.addWidget(b);return b
     def build_ui(self):
         root=QWidget();self.setCentralWidget(root);outer=QVBoxLayout(root);outer.setContentsMargins(20,12,20,12);outer.setSpacing(10)
-        top=QHBoxLayout();brand=QLabel('▥  INTERVAL   /   COMPOSER  '+APP_VERSION);brand.setStyleSheet('font-size:20px;font-weight:650;color:#a6f4cf');top.addWidget(brand);top.addStretch();top.addWidget(QLabel('01  ·  BEAT / NOTE / AREA'));outer.addLayout(top)
+        top=QHBoxLayout();brand=QLabel('▥  INTERVAL   /   COMPOSER  '+APP_VERSION);brand.setStyleSheet('font-size:20px;font-weight:650;color:#a6f4cf');top.addWidget(brand);top.addStretch();self.button('预览 T',self.open_preview,top);self.button('Agent',lambda:self.open_inspector(2),top);outer.addLayout(top)
         files=QHBoxLayout();outer.addLayout(files)
         for label,fn in [('新建',self.new),('打开工程 / 谱面',self.open_dialog),('导入歌曲',self.import_audio),('示例谱面',self.open_demo),('保存工程',self.save),('导出 JSON',self.export_json)]:
             if label=='示例谱面':
@@ -118,10 +129,12 @@ class Editor(QMainWindow):
         for tool,label in [('select','选择 V'),('tap','Tap Q'),('hold','Hold R')]:
             b=self.button(label,lambda checked=False,t=tool:self.set_tool(t),tools);b.setCheckable(True);self.tool_buttons[tool]=b
         tools.addSpacing(10);self.grid_basis=QComboBox();self.grid_basis.addItems(['每拍','每小节']);self.grid_basis.currentIndexChanged.connect(self.change_basis);tools.addWidget(self.grid_basis);self.division=QComboBox();self.division.addItems([f'1/{n}' for n in DIVISIONS]);self.division.currentIndexChanged.connect(self.change_division);tools.addWidget(self.division)
-        tools.addWidget(QLabel('绑定轨迹'));self.line_combo=QComboBox();self.line_combo.setMinimumWidth(145);tools.addWidget(self.line_combo);self.button('轨迹 / 四栏编辑',self.edit_tracks,tools);self.button('区域 / 四栏编辑',self.edit_regions,tools)
+        tools.addWidget(QLabel('绑定轨迹'));self.line_combo=QComboBox();self.line_combo.setMinimumWidth(145);tools.addWidget(self.line_combo)
+        self.lane_target=QComboBox();self.lane_target.setToolTip('四栏的编辑对象')
+        self.button('音符工具',lambda:self.open_inspector(0),tools)
         self.undo_button=self.button('撤销',self.undo,tools);self.redo_button=self.button('重做',self.redo,tools);self.button('检查谱面',self.validate,tools);tools.addStretch();outer.addLayout(tools)
         split=QSplitter();outer.addWidget(split,1);self.timeline=Timeline(self);split.addWidget(self.timeline)
-        right=QWidget();rl=QVBoxLayout(right);rl.setContentsMargins(8,0,0,0);rl.setSpacing(6);right.setMinimumWidth(440);right.setMaximumWidth(520)
+        self.inspector=QDialog(self);right=self.inspector;right.resize(520,760);self.inspector.finished.connect(self.inspector_closed);rl=QVBoxLayout(right);rl.setContentsMargins(8,0,0,0);rl.setSpacing(6);right.setMinimumWidth(440);right.setMaximumWidth(520)
         self.stage=Stage(self);self.stage.setMinimumHeight(230);self.stage.rectanglesChanged.connect(self.rectangles_changed);self.stage.selectedChanged.connect(self.rect_selected);rl.addWidget(self.stage)
         stagebar=QHBoxLayout();stagebar.addWidget(QLabel('预览比例'));aspect=QComboBox();aspect.addItems(['16:9','4:3']);aspect.currentIndexChanged.connect(lambda i:self.set_aspect(i));stagebar.addWidget(aspect);stagebar.addStretch();rl.addLayout(stagebar)
         self.tabs=QTabWidget();rl.addWidget(self.tabs,1)
@@ -144,13 +157,17 @@ class Editor(QMainWindow):
         motion_row=QHBoxLayout();self.motion_button=self.button('区域 / 四栏编辑',self.edit_motion,motion_row);self.motion_preview=QCheckBox('预览动画');self.motion_preview.toggled.connect(self.preview_motion);motion_row.addWidget(self.motion_preview);al.addLayout(motion_row)
         coords=QHBoxLayout();self.rect_spins=[]
         for title in ['左','上','右','下']:
-            col=QVBoxLayout();col.setSpacing(1);col.addWidget(QLabel(title));s=spin(0,100,3);s.setSingleStep(1);s.valueChanged.connect(self.numeric_rect);self.rect_spins.append(s);col.addWidget(s);coords.addLayout(col)
+            col=QVBoxLayout();col.setSpacing(1);col.addWidget(QLabel(title));low,high=display_range('center');s=spin(0,high,3,low);s.setSingleStep(1);s.valueChanged.connect(self.numeric_rect);self.rect_spins.append(s);col.addWidget(s);coords.addLayout(col)
         al.addLayout(coords)
         self.area_hint=QLabel('修改后点击“应用时间段”；未覆盖时段保持原样。');self.area_hint.setWordWrap(True);self.area_hint.setStyleSheet('color:#8da5a4;font-size:11px');al.addWidget(self.area_hint)
         row=QHBoxLayout();self.button('应用时间段',self.apply_region,row,True);self.button('该段恢复全域',self.reset_region,row);al.addLayout(row);al.addStretch();area_scroll=QScrollArea();area_scroll.setWidgetResizable(True);area_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff);area_wrapper=QWidget();area_layout=QVBoxLayout(area_wrapper);self.button('区域 / 四栏编辑',self.edit_regions,area_layout,True);region_help=QLabel('像线一样选择、新建和删除区域。默认全屏，角度 0°；确定后直接应用，可整体撤销。');region_help.setWordWrap(True);area_layout.addWidget(region_help);self.advanced_regions=QCheckBox('旧式分段 / 矩形工具');area_layout.addWidget(self.advanced_regions);area_layout.addWidget(areas);areas.setVisible(False);self.advanced_regions.toggled.connect(areas.setVisible);self.advanced_regions.toggled.connect(lambda _:self.tab_changed(self.tabs.currentIndex()));area_layout.addStretch();area_scroll.setWidget(area_wrapper);self.tabs.addTab(area_scroll,'判定区域');self.tabs.currentChanged.connect(self.tab_changed)
         self.agent_panel=AgentPanel(self);self.tabs.addTab(self.agent_panel,'Agent');self.agent_panel.refresh_target()
         self.area_start.valueChanged.connect(self.rectangles_changed);self.area_end.valueChanged.connect(self.rectangles_changed);self.area_label.textEdited.connect(self.rectangles_changed)
-        split.addWidget(right);split.setSizes([850,430])
+        self.tabs.tabBar().hide()
+        self.lanes=SharedLanes(self,self.lane_target);self.lanes.timeline.setMinimumWidth(300)
+        split.addWidget(self.lanes.timeline);split.addWidget(self.lanes.panel)
+        split.setChildrenCollapsible(False);split.setSizes([630,510,246]);split.setStretchFactor(0,1);split.setStretchFactor(1,1)
+        self.preview_dialog=None
         transport=QHBoxLayout();self.play_button=self.button('▶ 播放',self.toggle_play,transport,True);self.button('回到开头',lambda:self.seek(0),transport)
         self.time_label=QLabel('00:00.000');self.time_label.setMinimumWidth(98);transport.addWidget(self.time_label)
         self.slider=QSlider(Qt.Orientation.Horizontal);self.slider.setRange(0,60000);self.slider.sliderReleased.connect(lambda:self.seek_audio(self.slider.value()/1000));transport.addWidget(self.slider,1)
@@ -170,8 +187,36 @@ class Editor(QMainWindow):
     def configure_preview(self):
         self.hit_volume_label.setText(f'音量 {self.hit_volume.value()}%')
         self.hit_audio.bank.configure(self.hit_enabled.isChecked(),self.hit_volume.value()/100)
-        self.scroll_factor=self.scroll_speed.value();self.timeline.ppb=64*self.scroll_factor;self.timeline.sync();self.stage.update()
+        self.scroll_factor=self.scroll_speed.value();self.timeline.ppb=64*self.scroll_factor;self.timeline.sync();self.lanes.timeline.ppb=self.timeline.ppb;self.lanes.timeline.sync();self.stage.update()
         self.preview_save_timer.start(250)
+
+    def open_inspector(self,index):
+        self.tabs.setCurrentIndex(index);self.inspector.setWindowTitle(('音符工具','区域分段','制谱 Agent')[index])
+        self.stage.setVisible(index!=0)
+        self.inspector.show();self.inspector.raise_();self.inspector.activateWindow()
+
+    def inspector_closed(self,*_):
+        self.tabs.setCurrentIndex(0);self.stage.window=self;self.stage.editing=False
+
+    def open_preview(self):
+        if self.preview_dialog is not None:
+            self.preview_dialog.raise_();self.preview_dialog.activateWindow();return
+        dialog=QDialog(self);self.preview_dialog=dialog;dialog.setWindowTitle('游戏预览');dialog.resize(1000,630)
+        layout=QVBoxLayout(dialog);stage=Stage(self.stage.window);stage.aspect=self.stage.aspect;layout.addWidget(stage,1)
+        bar=QHBoxLayout();layout.addLayout(bar);self.button('播放 / 暂停',self.toggle_play,bar)
+        aspect=QComboBox();aspect.addItems(['16:9','4:3']);aspect.setCurrentIndex(int(stage.aspect==4/3));bar.addWidget(aspect)
+        def ratio(i):
+            stage.aspect=4/3 if i else 16/9;stage.update()
+        aspect.currentIndexChanged.connect(ratio);bar.addStretch()
+        def fullscreen():dialog.showNormal() if dialog.isFullScreen() else dialog.showFullScreen()
+        self.button('全屏 F11',fullscreen,bar);self.button('返回编辑 T',dialog.close,bar)
+        for key,fn in [('F11',fullscreen),('T',dialog.close),('Space',self.toggle_play)]:
+            shortcut=QShortcut(QKeySequence(key),dialog);shortcut.activated.connect(fn)
+        self.frameRendered.connect(stage.update)
+        def closed(*_):
+            self.frameRendered.disconnect(stage.update);self.hit_audio.pause();self.preview_dialog=None;dialog.deleteLater()
+        dialog.finished.connect(closed);dialog.show()
+        if not self.playing() and not self.hit_audio.wanted_play:self.toggle_play()
 
     def save_preview_options(self):
         try:atomic_json(self.cache/'preview-settings.json',dict(gain=self.hit_volume.value(),scroll=self.scroll_speed.value(),enabled=self.hit_enabled.isChecked()))
@@ -179,11 +224,18 @@ class Editor(QMainWindow):
 
     def build_shortcuts(self):
         entries={'Ctrl+N':self.new,'Ctrl+O':self.open_dialog,'Ctrl+S':self.save,'Ctrl+Shift+S':self.save_as,'Ctrl+Z':self.undo,'Ctrl+Y':self.redo,'Ctrl+Shift+Z':self.redo,'Ctrl+C':self.copy_notes,'Ctrl+V':self.paste_notes,'Ctrl+A':self.select_all,'Delete':self.delete_notes,'Space':self.toggle_play,'Q':lambda:self.set_tool('tap'),'R':lambda:self.set_tool('hold'),'V':lambda:self.set_tool('select'),'Left':lambda:self.seek(max(0,self.cursor-self.doc.step)),'Right':lambda:self.seek(self.cursor+self.doc.step)}
+        entries.update({'T':self.open_preview,'E':lambda:self.lanes.switch(not self.lanes.region_mode)})
         self.shortcuts=[]
         for key,fn in entries.items():
             shortcut=QShortcut(QKeySequence(key),self)
+            if key in ('E','T'):shortcut.setAutoRepeat(False)
             def guarded(fn=fn,key=key):
-                if isinstance(QApplication.focusWidget(),(QLineEdit,QDoubleSpinBox,QSpinBox,QPlainTextEdit)) and key in ('Q','R','V','Space','Delete','Left','Right','Ctrl+A','Ctrl+C','Ctrl+V','Ctrl+Z','Ctrl+Y','Ctrl+Shift+Z'):return
+                if isinstance(QApplication.focusWidget(),(QLineEdit,QDoubleSpinBox,QSpinBox,QPlainTextEdit)) and key in ('Q','R','V','T','E','Space','Delete','Left','Right','Ctrl+A','Ctrl+C','Ctrl+V','Ctrl+Z','Ctrl+Y','Ctrl+Shift+Z'):return
+                focus=QApplication.focusWidget();canvas=self.lanes.timeline
+                if focus is canvas or (focus and (canvas.isAncestorOf(focus) or self.lanes.panel.isAncestorOf(focus))):
+                    action={'Ctrl+C':self.lanes.copy_selected,'Ctrl+V':self.lanes.paste_selected,'Delete':self.lanes.delete_selected,
+                            'Ctrl+A':lambda:self.lanes.select_many(k for k,*_ in canvas.items())}.get(key)
+                    if action:action();return
                 fn()
             shortcut.activated.connect(guarded);self.shortcuts.append(shortcut)
     def message(self,title,text):QMessageBox.information(self,title,text)
@@ -198,7 +250,7 @@ class Editor(QMainWindow):
         self.setWindowTitle(('● ' if self.dirty else '')+self.doc.title+' — INTERVAL Composer '+APP_VERSION)
         self.division.blockSignals(True);self.division.setCurrentIndex(DIVISIONS.index(self.doc.division));self.division.blockSignals(False)
         self.grid_basis.blockSignals(True);self.grid_basis.setCurrentIndex(1 if self.doc.grid_unit=='bar' else 0);self.grid_basis.blockSignals(False)
-        self.undo_button.setEnabled(bool(self.history.undo_stack));self.redo_button.setEnabled(bool(self.history.redo_stack));self.timeline.sync();self.stage.update();self.refresh_regions()
+        self.undo_button.setEnabled(bool(self.history.undo_stack));self.redo_button.setEnabled(bool(self.history.redo_stack));self.timeline.sync();self.stage.update();self.refresh_regions();self.lanes.refresh()
     def selection_changed(self):
         selected=[n for n in self.doc.notes if n.id in self.selection];self.selection_label.setText(f'选中 {len(selected)} 个音符'+(f' · 第 {selected[0].beat:g} 拍' if len(selected)==1 else ''));self.timeline.viewport().update()
     def set_tool(self,tool):
@@ -323,7 +375,7 @@ class Editor(QMainWindow):
         if i<0:return
         values=[s.value()/100 for s in self.rect_spins]
         try:validate_rects([values])
-        except ValueError:self.area_hint.setText('坐标无效：需要左 < 右、上 < 下。');return
+        except ValueError as ex:self.area_hint.setText(str(ex));return
         self.stage.rects[i]=values;self.rectangles_changed()
     def apply_region(self):
         try:
@@ -337,7 +389,6 @@ class Editor(QMainWindow):
             doc=self.hit_audio.active_doc();self.cursor=self.clock.beat(doc.bpm,doc.offset)
             if self.loop_check.isChecked() and self.cursor>=self.loop_b and self.loop_b>self.loop_a:self.seek(self.loop_a)
             else:self.update_position()
-        if QApplication.activeModalWidget() is None:self.stage.update()
         self.frameRendered.emit()
     def playback_state_changed(self,state):
         if state==QMediaPlayer.PlaybackState.PlayingState:self.clock.start(self.player.position()/1000,self.player.playbackRate())
@@ -358,7 +409,7 @@ class Editor(QMainWindow):
         seconds=self.doc.seconds(self.cursor)+self.doc.offset;self.time_label.setText(f'{int(max(0,seconds))//60:02d}:{max(0,seconds)%60:06.3f}')
         sync_number(self.beat_jump,self.cursor)
         if not self.slider.isSliderDown():self.slider.setValue(int(max(0,seconds)*1000))
-        self.timeline.ensure_beat(self.cursor);self.stage.update()
+        self.timeline.ensure_beat(self.cursor);self.lanes.follow();self.stage.update()
     def duration_changed(self,ms):
         if ms>0:
             duration=ms/1000
@@ -401,6 +452,7 @@ class Editor(QMainWindow):
     def new(self):
         if self.maybe_save():self.replace_document(new_document(),None)
     def replace_document(self,doc,path):
+        self.recovery_writer.flush()
         self.agent_panel.reset_document()
         self.player.stop();self.clipboard=[];self.doc=doc;self.path=Path(path) if path else None;self.history=History();self.selection.clear();self.cursor=0;self.dirty=False;self.stage.rects=copy.deepcopy(FULL);self.stage.motions=[];self.stage.events=[];self.motion_preview.setChecked(False);self.stage.selected=-1;self.area_start.setValue(0);self.area_end.setValue(4);self.loop_check.setChecked(False);self.loop_a=0;self.loop_b=4;self.loop_label.setText('0 → 4 拍');self.region_dirty=False;self.area_hint.setText('修改后点击“应用时间段”；未覆盖时段保持原样。');self.load_audio();self.sync();self.update_position();self.timeline.ensure_beat(0);self.rect_selected()
     def open_dialog(self):
@@ -427,21 +479,22 @@ class Editor(QMainWindow):
         if self.region_dirty:self.message('区域草稿尚未应用','请先点击“应用时间段”再保存工程。');return False
         if self.path is None:return self.save_as()
         try:
-            atomic_json(self.path,self.doc.project());self.dirty=False;self.sync();self.recovery_path.unlink(missing_ok=True);self.statusBar().showMessage('已保存工程：'+str(self.path),6000);return True
+            atomic_json(self.path,self.doc.project());self.recovery_writer.flush();self.dirty=False;self.sync();self.recovery_path.unlink(missing_ok=True);self.statusBar().showMessage('已保存工程：'+str(self.path),6000);return True
         except Exception as ex:self.message('保存失败',str(ex));return False
     def save_as(self):
         path,_=QFileDialog.getSaveFileName(self,'保存工程',str(self.path or Path.home()/(self.doc.title+'.ivproj')),'INTERVAL 工程 (*.ivproj)')
         if not path:return False
         self.path=Path(path if path.lower().endswith('.ivproj') else path+'.ivproj');return self.save()
-    def autosave(self):
+    def autosave(self,background=False):
         if not (self.dirty or self.region_dirty):return
         try:
-            data=self.doc.project();data['source_path']=str(self.path) if self.path else ''
-            if self.region_dirty:data['areaDraft']=dict(start=self.area_start.value(),end=self.area_end.value(),label=self.area_label.text(),rects=self.stage.rects,motions=self.stage.motions,events=self.stage.events)
-            if self.region_dirty:data['areaDraft']=scale_spatial({'regions':[copy.deepcopy(data['areaDraft'])]},100,True)['regions'][0]
-            atomic_json(self.recovery_path,data)
-            self.statusBar().showMessage('已保存自动恢复快照',2500)
-        except OSError as ex:self.statusBar().showMessage('自动恢复快照写入失败：'+str(ex),10000)
+            draft=None
+            if self.region_dirty:draft=dict(start=self.area_start.value(),end=self.area_end.value(),label=self.area_label.text(),rects=self.stage.rects,motions=self.stage.motions,events=self.stage.events)
+            source=str(self.path) if self.path else ''
+            # Region drafts also change independently of the document's edit flag.
+            revision=(getattr(self,'_edit_serial',0),source) if draft is None else None
+            self.recovery_writer.save(self.recovery_path,self.doc,source,draft,background,revision)
+        except (OSError, ValueError, TypeError) as ex:self.statusBar().showMessage('自动恢复快照写入失败：'+str(ex),10000)
     def offer_recovery(self):
         if QMessageBox.question(self,'恢复未保存工程','发现上次未正常关闭前的自动恢复快照，是否恢复？')==QMessageBox.StandardButton.Yes:
             try:
@@ -486,7 +539,7 @@ class Editor(QMainWindow):
             except Exception as ex:self.message('导出失败',str(ex))
     def closeEvent(self,event):
         if self.maybe_save():
-            self.save_preview_options();self.agent_panel.client.cancel();self.hit_audio.close();self.player.stop();self.waveform.decoder.stop();self.recovery_path.unlink(missing_ok=True);event.accept()
+            self.autosave_timer.stop();self.recovery_writer.close();self.save_preview_options();self.agent_panel.client.cancel();self.hit_audio.close();self.player.stop();self.waveform.decoder.stop();self.recovery_path.unlink(missing_ok=True);event.accept()
         else:event.ignore()
 
 def main():

@@ -219,7 +219,11 @@ class ComposerHits(QObject):
             self.editor.statusBar().showMessage('正在转换为 Ogg，完成后从当前位置播放…' if self.preparing else '正在准备同步试听，完成后从当前位置播放…')
             if self.music is not None:self.mix_timer.start(0)
     def pause(self):
+        was_playing=self.editor.playing()
+        doc=self.active_doc()
+        beat=self.editor.clock.beat(doc.bpm,doc.offset) if was_playing else None
         self.wanted_play=False;self.editor.player.pause()
+        if was_playing:self.editor.seek(doc.snap(beat))
     def invalidate(self):
         self.seek(self.editor.cursor);self.request_mix()
     def seek(self,beat):

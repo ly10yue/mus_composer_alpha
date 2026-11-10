@@ -1,8 +1,11 @@
 {
-  "appVersion": "0.12.0",
+  "appVersion": "0.14.0",
   "formatVersion": 6,
   "coordinateScale": 100,
   "minReaderVersion": "0.12.0",
   "compatibilityBaseline": "Composer 0.11.0",
-  "androidVersionCode": 12
+  "androidVersionCode": 14,
+  "clientEngine": "Godot 4.7.1 / GDScript",
+  "editorVersion": "0.12.0",
+  "legacyClientVersion": "0.12.0"
 }

@@ -27,7 +27,7 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(len(d.region_at(1).rects),2);self.assertEqual(d.region_at(4).rects,[])
     def test_invalid_regions(self):
         d=Document()
-        for rect in [[[1,0,0,1]],[[0,0,float('nan'),1]],[[0,-.2,1,1]]]:
+        for rect in [[[1,0,0,1]],[[0,0,float('nan'),1]],[[0,-10.2,1,1]]]:
             with self.assertRaises(ValueError):d.set_region(1,2,rect,'bad')
         with self.assertRaises(ValueError):d.set_region(4,2,[],'bad')
     def test_bpm_keep_beats(self):
@@ -47,6 +47,21 @@ class ModelTests(unittest.TestCase):
             self.assertEqual(restored.chart('x'),d.chart('x'));self.assertEqual(Path(restored.audio).read_bytes(),song.read_bytes())
             atomic_json(p/'project.ivproj',d.project());project=Document.from_project(json.loads((p/'project.ivproj').read_text(encoding='utf-8')))
             self.assertEqual(project.chart(),d.chart())
+    def test_offscreen_project_and_package_round_trip(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp);song=p/'song.ogg';song.write_bytes(b'example audio')
+            d=Document(audio=str(song));r=d.regions[0]
+            r.rects=[[4.5,0,5.5,0],[0,0,1,1]]
+            interval=lambda a,b: dict(start=0,end=2,**{'from':a,'to':b},ease='linear')
+            r.events=[{'center':[interval([5,.5],[.5,.5])],'height':[interval(0,1)]},{}]
+            d.lines[0].frames[0]['x']=-5
+            d.lines[0].events={'x':[interval(-5,.5)]};d.add(3,'line1')
+            export_package(d,p/'test.interval')
+            for restored in (Document.from_project(d.project()),import_package(p/'test.interval',p/'out')):
+                self.assertEqual(restored.chart('song.ogg'),d.chart('song.ogg'))
+                self.assertEqual(restored.lines[0].value('x',0),-5)
+                self.assertEqual(restored.lines[0].value('x',2),.5)
+
     def test_zip_traversal(self):
         with tempfile.TemporaryDirectory() as tmp:
             p=Path(tmp);d=Document().chart('../evil.ogg')

@@ -32,10 +32,10 @@ server=ThreadingHTTPServer(('127.0.0.1',0),Handler);server.requests=[];server.re
 thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
 app=QApplication([]);app.setApplicationName('IntervalAgentTests');app.setStyleSheet(STYLE);QFontDatabase.addApplicationFont('C:/Windows/Fonts/msyh.ttc');app.setFont(QFont('Microsoft YaHei UI',10))
 w=Editor(False);w.resize(1440,940);w.show();w.output.setVolume(0);p=w.agent_panel
-song=str(ROOT/'app/src/main/assets/desultory-signals.ogg');screens=ROOT/'docs/screenshots/agent';screens.mkdir(parents=True,exist_ok=True)
+song=str(ROOT/'app/src/main/assets/desultory-signals.ogg');screens=ROOT/'build/editor-tests/agent-screens';screens.mkdir(parents=True,exist_ok=True)
 def document():return Document(title='Agent editing test',bpm=120,duration=150.750667,audio=song)
 def reset():
-    w.replace_document(document(),None);w.load_region_draft(w.doc.regions[0]);w.stage.selected=0;w.tabs.setCurrentWidget(p);QTest.qWait(30)
+    w.replace_document(document(),None);w.load_region_draft(w.doc.regions[0]);w.stage.selected=0;w.open_inspector(2);QTest.qWait(30)
 def until(fn,timeout=6000):
     end=time.monotonic()+timeout
     while time.monotonic()<end:
@@ -49,7 +49,7 @@ try:
     QTest.keyClick(p.prompt,Qt.Key.Key_A,Qt.KeyboardModifier.ControlModifier);QTest.keyClick(p.prompt,Qt.Key.Key_Delete);assert not p.prompt.toPlainText() and not w.doc.notes
     QTest.mouseClick(p.demo_button,Qt.MouseButton.LeftButton);assert p.session and fingerprint(w.doc)==baseline
     w.seek(8);QTest.qWait(80);assert w.stage.window.doc is p.session.doc
-    w.grab().save(str(screens/'local-draft.png'))
+    w.inspector.grab().save(str(screens/'local-draft.png'))
     QTest.mouseClick(p.apply_button,Qt.MouseButton.LeftButton);assert len(w.doc.regions)==3 and len(w.doc.region_at(8).motions[0])==2
     w.undo();assert fingerprint(w.doc)==baseline
     # Configure through the actual masked input UI; persisted JSON excludes key.
@@ -78,7 +78,7 @@ try:
     assert p.session and len(p.session.operations)==2 and p.session.doc.region_at(8).motions[0][0]['ease']=='smooth' and fingerprint(w.doc)==baseline
     preserved=fingerprint(p.session.doc);server.responses=[(401,0,dict(error='reflected local-test-key'))];p.prompt.setPlainText('继续调整');p.send();until(lambda:not p.client.active)
     assert p.session and fingerprint(p.session.doc)==preserved
-    w.seek(8);QTest.qWait(50);w.grab().save(str(screens/'api-draft.png'));w.resize(1024,640);QTest.qWait(100);w.grab().save(str(screens/'small-window.png'));print('Small editor size:',w.width(),w.height());w.resize(1440,940);w.set_aspect(1);QTest.qWait(50);w.stage.grab().save(str(screens/'preview-4x3.png'))
+    w.seek(8);QTest.qWait(50);w.inspector.grab().save(str(screens/'api-draft.png'));w.resize(1024,640);QTest.qWait(100);w.grab().save(str(screens/'small-window.png'));print('Small editor size:',w.width(),w.height());w.resize(1440,940);w.set_aspect(1);QTest.qWait(50);w.stage.grab().save(str(screens/'preview-4x3.png'))
     p.apply();assert len(w.doc.regions)==3;out=ROOT/'build/editor-tests/agent.interval';export_package(w.doc,out)
     assert 'local-test-key' not in json.dumps(w.doc.project()) and 'base_url' not in json.dumps(w.doc.project())
     w.undo();assert fingerprint(w.doc)==baseline

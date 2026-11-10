@@ -45,7 +45,11 @@ class AgentPanel(QWidget):
 
     def target(self,doc=None):
         d=doc or self.editor.doc;e=self.editor
-        if doc is None:
+        lanes=getattr(e,'lanes',None)
+        inline=doc is None and lanes is not None and lanes.region_mode
+        if inline:
+            candidates=[(i,r) for i,r in enumerate(d.regions) if r is lanes.region]
+        elif doc is None:
             candidates=[(i,r) for i,r in enumerate(d.regions) if abs(r.start-e.area_start.value())<1e-5 and abs(r.end-e.area_end.value())<1e-5]
         else:candidates=[]
         anchor=e.cursor
@@ -57,7 +61,7 @@ class AgentPanel(QWidget):
                     a=operation['arguments'];anchor=(a['start_beat']+a['end_beat'])/2;break
         if not candidates:candidates=[(i,r) for i,r in enumerate(d.regions) if r.start<=anchor<r.end]
         if not candidates:return None
-        i,r=candidates[0];selected=e.stage.selected
+        i,r=candidates[0];selected=lanes.index if inline else e.stage.selected
         rect_index=selected if 0<=selected<len(r.rects) else (0 if len(r.rects)==1 else None)
         return dict(region_index=i,rect_index=rect_index,start_beat=r.start,end_beat=r.end,label=r.label,
                     rect=r.rects[rect_index] if rect_index is not None else None)

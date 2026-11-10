@@ -1,5 +1,6 @@
 """Independent rectangle channels, in beats in projects and seconds in charts."""
 import math
+from versioning import VALUE_RANGES
 from curves import Curve,EASES
 
 PROPS=('center','angle','width','height')
@@ -14,7 +15,7 @@ def validate_channel(events,prop):
         for key in ('from','to'):
             value=e.get(key);values=value if prop=='center' else [value]
             if not isinstance(values,list) or len(values)!=(2 if prop=='center' else 1):raise ValueError('中心点须为 [X,Y]')
-            low,high=(-2,3) if prop=='center' else (-36000,36000) if prop=='angle' else (.001,4)
+            low,high=VALUE_RANGES[prop]
             if not all(type(v) in (int,float) and math.isfinite(v) and low<=v<=high for v in values):raise ValueError(f'{prop} 数值须在 {low}–{high} 内')
         if e.get('ease','linear') not in EASES:raise ValueError('区域变化类型无效')
         last=e['end']

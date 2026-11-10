@@ -1,11 +1,12 @@
 """Editor canvases: beat grid, rectangle authoring, and game-space preview."""
 import copy
 import math
+from versioning import POSITION_LIMIT
 from motion import polygon
 from model import Note
 from timeline_edit import GridWheel
 from edge_pan import EdgePan
-from PySide6.QtCore import Qt, QRectF, QPointF, Signal
+from PySide6.QtCore import Qt, QRectF, QPointF, QLineF, Signal
 from PySide6.QtGui import QColor, QPainter, QPen, QFont, QPolygonF, QPainterPath,QTransform
 from PySide6.QtWidgets import QAbstractScrollArea, QWidget
 
@@ -60,11 +61,26 @@ class Timeline(QAbstractScrollArea):
         # Time navigation moves the chart, never the judgement line.
         bar=self.verticalScrollBar();bar.blockSignals(True);bar.setValue(round(beat*1000));bar.blockSignals(False)
         self.viewport().update()
+    def region_background(self,field):
+        """Map the active region to screen space, independently of the beat grid."""
+        region=self.doc.region_at(self.window.cursor);outline=QPainterPath()
+        if region and field.height()>0 and field.width()>0:
+            for i,rect in enumerate(region.rects):
+                points=polygon(rect,region.motions[i] if region.motions else [],self.window.cursor,
+                               field.width()/field.height(),region.events[i] if region.events else {})
+                if not points:continue
+                shape=QPainterPath()
+                shape.addPolygon(QPolygonF([QPointF(field.left()+x*field.width(),field.top()+y*field.height()) for x,y in points]))
+                shape.closeSubpath();outline=outline.united(shape)
+        return outline
     def paintEvent(self,event):
         p=QPainter(self.viewport());p.setRenderHint(QPainter.RenderHint.Antialiasing);p.fillRect(self.viewport().rect(),BG)
         width=self.viewport().width();height=self.viewport().height();p.setFont(QFont('Consolas',9))
         first=max(0,self.y_beat(height)-1);last=min(self.doc.end_beat,self.y_beat(27)+1)
         p.fillRect(QRectF(0,self.judgement_y(),width,height-self.judgement_y()),QColor('#0c1416'))
+        field=QRectF(self.ruler,27,width-self.ruler-20,height-27)
+        p.save();p.setClipRect(field);p.setPen(QPen(QColor('#467565'),1));p.setBrush(QColor(110,222,174,24))
+        p.drawPath(self.region_background(field));p.restore()
         for r in self.doc.regions:
             if r.end<first or r.start>last:continue
             y=self.beat_y(r.start);end=self.beat_y(r.end)
@@ -87,7 +103,7 @@ class Timeline(QAbstractScrollArea):
             p.drawPolyline(QPolygonF([QPointF(self.x_at(x),self.beat_y(b)) for b,x in points]))
             x=self.x_at(track.pose(self.window.cursor)[0]);p.drawEllipse(QPointF(x,self.judgement_y()),4,4)
             alpha=track.pose(self.window.cursor)[1]
-            if alpha>=.5 or track.id in selected_lines:labels.append((track.id not in selected_lines,-alpha,x,track.name))
+            if field.left()<=x<=field.right() and (alpha>=.5 or track.id in selected_lines):labels.append((track.id not in selected_lines,-alpha,x,track.name))
         occupied=[[],[]];p.setPen(MUTED)
         for _,_,x,name in sorted(labels):
             left=max(self.ruler,min(width-100,x-35))
@@ -98,10 +114,12 @@ class Timeline(QAbstractScrollArea):
         # The same song envelope is shown alongside the beat ruler.
         if self.window.peaks:
             p.setPen(QColor('#42665b'))
+            waveform=[]
             for y in range(0,height,3):
                 t=self.doc.seconds(self.y_beat(y))+self.doc.offset;idx=int(t*50)
                 if 0<=idx<len(self.window.peaks):
-                    amp=self.window.peaks[idx]*22;p.drawLine(QPointF(self.ruler+amp,y),QPointF(self.ruler,y))
+                    amp=self.window.peaks[idx]*22;waveform.append(QLineF(self.ruler+amp,y,self.ruler,y))
+            p.drawLines(waveform)
         preview={}
         if self.drag and self.drag['kind'] in ('move','tail'):
             selected=[n for n in self.doc.notes if n.id in self.window.selection]
@@ -229,12 +247,13 @@ class Stage(QWidget):
         animated=not self.editing or self.motion_preview or self.window.playing()
         motions=self.motions if self.editing else (region.motions if region else [])
         events=self.events if self.editing else (region.events if region else [])
-        p.save();p.setClipRect(r)
+        p.save();p.setClipRect(f)
         union=QPainterPath()
         for i,rect in enumerate(rects):
             shape=QPainterPath()
             if animated:
                 points=polygon(rect,motions[i] if motions else [],self.window.cursor,f.width()/f.height(),events[i] if events else {})
+                if not points:continue
                 shape.addPolygon(QPolygonF([QPointF(f.left()+x*f.width(),f.top()+y*f.height()) for x,y in points]));shape.closeSubpath()
             else:shape.addRect(self.mapped(rect))
             union=union.united(shape)
@@ -250,17 +269,18 @@ class Stage(QWidget):
             owner=getattr(self.window,'editor',None) or getattr(getattr(self.window,'panel',None),'editor',None) or self.window
             factor=getattr(owner,'scroll_factor',1.0)
             now=doc.seconds(self.window.cursor);speed=r.height()*.625/2.2*factor;unit=doc.bpm/60
-            p.save();p.setClipRect(r)
+            p.save();p.setClipRect(f)
             def position(beat,x,track):return QPointF(f.left()+x*f.width(),line-doc.seconds(track.distance(self.window.cursor,beat))*speed)
             horizons={track.id:track.horizon(self.window.cursor,2.9/factor*unit,doc.end_beat) for track in doc.lines}
+            tracks={track.id:track for track in doc.lines}
             for track in doc.lines:
                 points=track.samples(self.window.cursor,self.window.cursor,horizons[track.id],.035*unit/factor)
                 color=QColor(MINT);color.setAlpha(round(track.pose(self.window.cursor)[1]*140));p.setPen(QPen(color,1.5))
                 p.drawPolyline(QPolygonF([position(b,x,track) for b,x in points]));p.setBrush(color);p.drawEllipse(position(self.window.cursor,track.pose(self.window.cursor)[0],track),3,3)
             for n in doc.notes:
-                t=doc.seconds(n.beat);end=doc.seconds(n.beat+n.length)
-                track=doc.track(n.line)
-                if track.distance(self.window.cursor,n.beat)>2.8/factor*unit or end<now-.15:continue
+                if n.beat+n.length<self.window.cursor-.15*unit or n.beat>horizons[n.line]:continue
+                track=tracks[n.line]
+                if track.distance(self.window.cursor,n.beat)>2.8/factor*unit:continue
                 start=max(n.beat,self.window.cursor) if n.length else n.beat
                 width=f.width()*.092;head=position(start,doc.note_x(n,self.window.cursor,start),track)
                 if n.length:
@@ -291,14 +311,14 @@ class Stage(QWidget):
         if not self.drag:return
         kind,origin,old=self.drag;x,y=self.point(event.position());i=self.selected
         if kind=='new':self.rects[i]=[min(origin[0],x),min(origin[1],y),max(origin[0],x),max(origin[1],y)]
-        elif kind=='resize':self.rects[i]=[old[0],old[1],max(old[0]+.01,x),max(old[1]+.01,y)]
+        elif kind=='resize':self.rects[i]=[old[0],old[1],max(old[0],min(old[0]+POSITION_LIMIT,x)),max(old[1],min(old[1]+POSITION_LIMIT,y))]
         else:
-            dx=max(-old[0],min(x-origin[0],1-old[2]));dy=max(-old[1],min(y-origin[1],1-old[3]));self.rects[i]=[old[0]+dx,old[1]+dy,old[2]+dx,old[3]+dy]
-        self.rects[i]=[round(max(0,min(1,v)),4) for v in self.rects[i]];self.update();self.selectedChanged.emit()
+            dx=max(-POSITION_LIMIT-old[0],min(x-origin[0],POSITION_LIMIT-old[2]));dy=max(-POSITION_LIMIT-old[1],min(y-origin[1],POSITION_LIMIT-old[3]));self.rects[i]=[old[0]+dx,old[1]+dy,old[2]+dx,old[3]+dy]
+        self.rects[i]=[round(v,4) for v in self.rects[i]];self.update();self.selectedChanged.emit()
     def mouseReleaseEvent(self,event):
         if not self.drag:return
-        self.drag=None
-        if self.selected>=0:
+        kind=self.drag[0];self.drag=None
+        if kind=='new' and self.selected>=0:
             l,t,r,b=self.rects[self.selected]
             if r-l<.01 or b-t<.01:
                 self.rects.pop(self.selected);self.motions.pop(self.selected)

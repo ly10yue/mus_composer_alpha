@@ -27,6 +27,17 @@ class PlaybackClockTests(unittest.TestCase):
         before=c.seconds();c.set_rate(1);self.assertEqual(c.seconds(),before)
         self.wall=5.25;self.assertAlmostEqual(c.seconds(),before+.05)
         c.reset(30,True);c.observe(10);self.assertEqual(c.seconds(),30)
-        self.wall=5.35;c.observe(30.1);self.wall=20;self.assertLessEqual(c.seconds(),30.25)
+        self.wall=5.35;c.observe(30.1);self.wall=20;self.assertAlmostEqual(c.seconds(),30.25)
+
+    def test_jittery_audio_reports_do_not_freeze_visual_clock(self):
+        c=self.clock;c.start(0,1)
+        values=[]
+        for i in range(1,301):
+            self.wall=i*.016
+            if i%5==0:c.observe(self.wall-(.035 if i%10==0 else .005))
+            values.append(c.seconds())
+        increments=[b-a for a,b in zip(values[20:],values[21:])]
+        self.assertGreater(min(increments),.010)
+        self.assertLess(abs(values[-1]-self.wall),.08)
 
 if __name__=='__main__':unittest.main()

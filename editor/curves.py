@@ -1,5 +1,6 @@
 """Independent non-overlapping parameter intervals and exact speed integrals."""
 from bisect import bisect_right
+from versioning import VALUE_RANGES
 import math
 
 EASES=('linear','sine_in_out','sine_in','sine_out','smooth','hold')
@@ -23,11 +24,11 @@ def ease_integral(u,kind):
 
 def validate_events(events,prop):
     if not isinstance(events,list) or len(events)>256:raise ValueError('每一栏最多 256 个变化区间')
-    last=0.;maximum=8 if prop=='speed' else 1
+    last=0.;minimum,maximum=VALUE_RANGES[prop]
     for event in events:
         if not isinstance(event,dict) or not all(type(event.get(k)) in (int,float) and math.isfinite(event[k]) for k in ('start','end','from','to')):raise ValueError('变化区间需要有限的起止拍与起止值')
         if not 0<=event['start']<event['end']<=600000 or event['start']<last-1e-8:raise ValueError('同一栏的区间不能重叠，且终点必须晚于起点')
-        if not all(0<=event[k]<=maximum for k in ('from','to')):raise ValueError(f'{prop} 起止值必须在 0–{maximum} 之间')
+        if not all(minimum<=event[k]<=maximum for k in ('from','to')):raise ValueError(f'{prop} 起止值必须在 {minimum}–{maximum} 之间')
         if event.get('ease','linear') not in EASES:raise ValueError('不支持的变化类型')
         last=event['end']
 

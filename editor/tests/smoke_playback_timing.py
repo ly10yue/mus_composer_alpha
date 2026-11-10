@@ -31,7 +31,11 @@ try:
             if w.playing():records.append((time.perf_counter(),w.cursor))
         w.frameRendered.connect(frame);w.toggle_play();wait_until(lambda:w.cursor>=24.6,15)
         w.hit_audio.pause();w.frameRendered.disconnect(frame);canvas.paintEvent=original
+        assert abs(w.cursor-w.doc.snap(w.cursor))<1e-7, w.cursor
+        assert abs(w.player.position()/1000-(w.doc.seconds(w.cursor)+w.doc.offset))<.02
         stable=[point for point in records if point[1]>=18];ratio=sum(b[1]>a[1]+.00001 for a,b in zip(stable,stable[1:]))/max(1,len(stable)-1)
+        intervals=[(b[0]-a[0])*1000 for a,b in zip(stable,stable[1:])]
+        speeds=[(b[1]-a[1])/(b[0]-a[0]) for a,b in zip(stable,stable[1:]) if b[0]>a[0]]
         bar=crossing(records,24)-crossing(records,20);expected=240/bpm/rate
         assert abs(bar-expected)<.05,(bpm,rate,bar,expected)
         assert ratio>.93,(bpm,rate,ratio)
@@ -39,7 +43,7 @@ try:
         frozen=w.cursor;deadline=time.perf_counter()+.12
         while time.perf_counter()<deadline:app.processEvents();time.sleep(.001)
         assert w.cursor==frozen
-        reports.append(dict(bpm=bpm,rate=rate,page='four lanes' if modal else 'main',expectedBarSeconds=expected,measuredBarSeconds=bar,changingFrameRatio=ratio,paintMedianMs=statistics.median(paints),paintMaxMs=max(paints),frames=len(records)))
+        reports.append(dict(bpm=bpm,rate=rate,page='four lanes' if modal else 'main',expectedBarSeconds=expected,measuredBarSeconds=bar,changingFrameRatio=ratio,frameMedianMs=statistics.median(intervals),frameP95Ms=sorted(intervals)[int(.95*(len(intervals)-1))],frameMaxMs=max(intervals),speedMin=min(speeds),speedMax=max(speeds),paintMedianMs=statistics.median(paints),paintMaxMs=max(paints),frames=len(records)))
         print(reports[-1],flush=True)
         if d:d.reject()
     atomic_json(ROOT/'build/playback-timing.json',reports)

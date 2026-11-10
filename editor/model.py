@@ -11,7 +11,7 @@ import zipfile
 from motion import validate_motions, reachable, ASPECTS
 from tracks import Track, defaults, validate_tracks
 from region_events import validate_region_events,scale_events
-from versioning import encode,decode
+from versioning import POSITION_LIMIT,encode,decode,metadata,scale_spatial
 
 DIVISIONS = (1, 2, 3, 4, 6, 8, 12, 16, 24, 32)
 FULL = [[0., 0., 1., 1.]]
@@ -248,13 +248,17 @@ class Document:
         return encode(result)
 
     def project(self):
-        data=asdict(self)
+        return self.pack_project(asdict(self))
+
+    @staticmethod
+    def pack_project(data):
+        """Encode detached document fields; the caller owns the input tree."""
         for r in data['regions']:
             if not any(r['motions']):r.pop('motions')
             if not any(r['events']):r.pop('events')
         for line in data['lines']:
             if not line['events']:line.pop('events')
-        return encode(dict(format='interval-project', version=self.format_version(), document=data),True)
+        return dict(format='interval-project', document=scale_spatial(data,100,True), **metadata())
 
     @classmethod
     def from_project(cls, data, base=None):
@@ -341,14 +345,15 @@ def validate_rects(rects):
         if len(rect)!=4 or not all(isinstance(v,(int,float)) and math.isfinite(v) for v in rect):
             raise ValueError('区域坐标必须为四个有限数字')
         l,t,r,b=rect
-        if not 0<=l<r<=1 or not 0<=t<b<=1:
-            raise ValueError('矩形坐标必须在 0–1 内，且左 < 右、上 < 下')
+        if not -POSITION_LIMIT<=l<=r<=POSITION_LIMIT or not -POSITION_LIMIT<=t<=b<=POSITION_LIMIT or max(r-l,b-t)>POSITION_LIMIT+1e-10:
+            raise ValueError('矩形坐标须在 ±1000 内，左 ≤ 右、上 ≤ 下，长宽不超过 1000（全屏为 100）')
 
-def atomic_json(path, value):
+def atomic_json(path, value, *, compact=False):
     path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
     temporary=path.with_name(path.name+'.tmp')
     with temporary.open('w',encoding='utf-8') as file:
-        json.dump(value,file,ensure_ascii=False,indent=2,allow_nan=False)
+        if compact:file.write(json.dumps(value,ensure_ascii=False,separators=(',',':'),allow_nan=False))
+        else:json.dump(value,file,ensure_ascii=False,indent=2,allow_nan=False)
         file.flush();os.fsync(file.fileno())
     os.replace(temporary,path)
 

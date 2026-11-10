@@ -1,6 +1,6 @@
 # 内联制谱 Agent · 接入与工具说明
 
-运行 `dist/editor-0.12.0/IntervalComposer/IntervalComposer.exe`，右侧选择 **Agent** 页签。无需另装 Python 或 SDK。所有导出统一为 v6，需要 Android 0.12.0；支持 0.11.0 旧谱面坐标迁移。
+运行 `dist/editor-0.12.0/IntervalComposer/IntervalComposer.exe`，从顶部打开 **Agent**（旧版发行包为右侧页签）。无需另装 Python 或 SDK。所有导出统一为 v6，需要 Android 0.12.0；支持 0.11.0 旧谱面坐标迁移。
 
 ## 使用
 
@@ -62,8 +62,8 @@
 
 - 内部工具时间为 **绝对拍数**；导出时才换成秒。小节编号从 **1** 开始，拍数从 **0** 开始。
 - 第 N 小节开头：`(N−1) × meter`。默认每小节 4 拍，“第二小节开头至第四小节开头”对应 `[4,12)`；若包括第四小节全部内容，则写“到第四小节结束”，对应 `[4,16)`。
-- 坐标范围 0–100，X 向右、Y 向下；矩形为 `[left,top,right,bottom]`。左半屏 X 为 0–50；从下到上意味着 Y 递减。
-- 区域动画是相对基础矩形中心的平移和旋转；X/Y 位移范围 ±200，角度范围 ±36000，正角度顺时针。可用区域四栏时间条随时间改变中心点、角度、总长和总宽。
+- 屏内坐标 0–100，区域中心和轨迹 X 可在 ±1000 内离屏；区域长宽 0–1000，任一边为零时隐藏且不可判定，X 向右、Y 向下；矩形为 `[left,top,right,bottom]`。左半屏 X 为 0–50；从下到上意味着 Y 递减。
+- 区域动画是相对基础矩形中心的平移和旋转；X/Y 位移范围 ±1000，角度范围 ±36000，正角度顺时针。可用区域四栏时间条随时间改变中心点、角度、总长和总宽。
 - `ease`：`linear` 匀速，`smooth` 平滑，`hold` 保持至下一帧。
 - 区间 `[start_beat,end_beat)` 左闭右开，终点属于后一段。范围外原状态保留；需要运动完成后保持在上方时，请明确要求后续保持区间。
 
@@ -105,7 +105,7 @@
 }
 ```
 
-`set_region.motions` 可为 `[]`，否则与 rects 一一对应。每个元素是一组 `{beat,x,y,angle,ease}`。`set_track.frames` 是 `{beat,x,alpha,ease}`，其中 x 为 0–100、alpha 为 0–1。矩形和轨迹每条最多 256 帧，时间严格递增；每段最多 32 个矩形，每谱最多 64 条轨迹、20000 音符。更完整例子见 [examples.md](skills/interval-chart-agent/references/examples.md)。
+`set_region.motions` 可为 `[]`，否则与 rects 一一对应。每个元素是一组 `{beat,x,y,angle,ease}`。`set_track.frames` 是 `{beat,x,alpha,ease}`，其中 x 为 ±1000（屏内为 0–100）、alpha 为 0–1。矩形和轨迹每条最多 256 帧，时间严格递增；每段最多 32 个矩形，每谱最多 64 条轨迹、20000 音符。更完整例子见 [examples.md](skills/interval-chart-agent/references/examples.md)。
 
 ## Skill 与扩展入口
 

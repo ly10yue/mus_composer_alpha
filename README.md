@@ -1,3 +1,11 @@
+# INTERVAL Composer 最新源码
+
+当前制谱器的使用与构建说明见 [editor/README.md](editor/README.md)，Agent 交接见 [editor/AGENTS.md](editor/AGENTS.md)。历史发行包见 [Releases](https://github.com/ly10yue/mus_composer_alpha/releases)。
+
+以下为既有版本说明。
+
+---
+
 # INTERVAL · 区间
 
 Android 下落式音乐游戏与 Windows 制谱器，当前统一版本 **0.12.0**。仅 Tap / Hold，固定下方判定线，支持横屏 16:9 与 4:3。触点可以位于任意高度，但必须落在谱面指定的二维区域内，并满足音符横向位置与时间判定。

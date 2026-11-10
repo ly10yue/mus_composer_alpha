@@ -55,7 +55,11 @@ atomic_json(out/'motion-parity.json',samples)
 w.open_path(out/'motion.interval');assert w.doc.chart('music.ogg')==chart
 deadline=time.monotonic()+5
 while (not w.audio_loaded or not w.hit_audio.mix_ready) and time.monotonic()<deadline:app.processEvents();time.sleep(.003)
-w.tabs.setCurrentIndex(0);w.seek(2);shape=polygon(w.doc.regions[0].rects[0],w.doc.regions[0].motions[0],w.cursor,1.6);w.toggle_play();QTest.qWait(500);w.toggle_play()
+w.tabs.setCurrentIndex(0);w.seek(2);shape=polygon(w.doc.regions[0].rects[0],w.doc.regions[0].motions[0],w.cursor,1.6);w.toggle_play()
+# Device startup latency is independent of region motion. Wait for an actual beat.
+deadline=time.monotonic()+3
+while w.cursor<3 and time.monotonic()<deadline:QTest.qWait(10)
+w.toggle_play()
 assert w.cursor>2.5 and polygon(w.doc.regions[0].rects[0],w.doc.regions[0].motions[0],w.cursor,1.6)!=shape
 w.dirty=False;w.region_dirty=False;w.close()
 print('PASS: legacy motion import and four-lane controls, add/update/delete, cancel, live preview, apply, undo/redo, autosave, v5 project/package round trip, both aspect previews, real playback')

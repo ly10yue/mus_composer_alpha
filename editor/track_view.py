@@ -29,6 +29,7 @@ class TrackTimeline(QAbstractScrollArea):
         return QRectF(self.ruler+column*width,30,width,self.viewport().height()-30)
     def column(self,x):return min(3,int((x-self.ruler)/self.lane(0).width())) if x>=self.ruler else -1
     def sync(self):
+        self._items_cache=None
         bar=self.verticalScrollBar();bar.blockSignals(True);bar.setRange(0,round(self.doc.end_beat*1000));bar.setSingleStep(max(1,round(self.doc.step*1000)));bar.setPageStep(round(self.viewport().height()/self.ppb*1000));bar.setValue(round(self.window.cursor*1000));bar.blockSignals(False);self.viewport().update()
     def resizeEvent(self,event):super().resizeEvent(event);self.sync()
     def ensure_beat(self,beat):
@@ -36,11 +37,19 @@ class TrackTimeline(QAbstractScrollArea):
     def scrollContentsBy(self,dx,dy):self.viewport().update()
     def scrub(self,value):self.window.pause();self.window.editor.seek(value/1000)
     def items(self):
-        for note in self.doc.notes:
-            if 'notes' in self.window.PROPS and note.line==self.window.track.id:yield ('notes',note.id),note.beat,note.beat+note.length,note
+        if getattr(self.window,'cache_lane_items',False):
+            if self._items_cache is None:self._items_cache=list(self._items())
+            yield from self._items_cache
+        else:yield from self._items()
+
+    def _items(self):
+        track=self.window.track
+        if 'notes' in self.window.PROPS:
+            for note in self.doc.notes:
+                if note.line==track.id:yield ('notes',note.id),note.beat,note.beat+note.length,note
         for prop in self.window.PROPS:
             if prop=='notes':continue
-            for index,event in enumerate(self.window.track.segments(prop)):yield (prop,index),event['start'],event['end'],event
+            for index,event in enumerate(track.segments(prop)):yield (prop,index),event['start'],event['end'],event
     def bounds(self,prop,start,end):
         cell=self.lane(self.window.PROPS.index(prop));top=self.beat_y(end);bottom=self.beat_y(start)
         return QRectF(cell.left()+9,top-5 if start==end else top,cell.width()-18,max(10,bottom-top))
@@ -146,7 +155,9 @@ class TrackTimeline(QAbstractScrollArea):
     def mouseDoubleClickEvent(self,event):
         item=self.hit(event.position())
         if item:
-            self.drag=None;self.window.select(item[0]);box=self.window.start if item[0][0]=='notes' else self.window.value_from;box.setFocus();box.selectAll()
+            self.drag=None
+            if hasattr(self.window,'edit_item'):self.window.edit_item(item[0]);return
+            self.window.select(item[0]);box=self.window.start if item[0][0]=='notes' else self.window.value_from;box.setFocus();box.selectAll()
     def wheelEvent(self,event):
         if event.modifiers() & Qt.KeyboardModifier.ControlModifier:self.window.zoom.setValue(self.window.zoom.value()*(1.2 if event.angleDelta().y()>0 else 1/1.2))
         else:

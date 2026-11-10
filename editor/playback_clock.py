@@ -31,6 +31,9 @@ class PlaybackClock:
         else:
             predicted=self.seconds();error=seconds-predicted
             if abs(error)>.25:self.reset(seconds,True);self.advancing=True;return
-            self.anchor=predicted+.15*error
+            # Spread timestamp jitter over future updates; a backward correction
+            # larger than a frame would otherwise freeze the monotonic cursor.
+            correction=max(-.002,min(.002,.15*error))
+            self.anchor=predicted+correction
         self.raw=seconds;self.wall=self.report_wall=now
     def beat(self,bpm,offset):return max(0.,(self.seconds()-offset)*bpm/60)

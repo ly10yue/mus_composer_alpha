@@ -1,5 +1,6 @@
 """Region keyframes and geometry. Matches Engine.Zone in the Android runtime."""
 import math
+from versioning import POSITION_LIMIT
 
 EASINGS = ('linear', 'smooth', 'hold')
 ASPECTS = ((1066.6666667-96)/600, (800-96)/600)
@@ -13,8 +14,8 @@ def validate_motions(motions, count):
         for f in frames:
             if not isinstance(f,dict) or not all(isinstance(f.get(k),(int,float)) and math.isfinite(f[k]) for k in ('beat','x','y','angle')):
                 raise ValueError('关键帧必须包含有限的拍数、位移和角度')
-            if not 0<=f['beat']<=600000 or f['beat']<=previous or abs(f['x'])>2 or abs(f['y'])>2 or abs(f['angle'])>36000 or f.get('ease','linear') not in EASINGS:
-                raise ValueError('关键帧拍数需递增且非负；位移 ±2、角度 ±36000，缓动类型必须有效')
+            if not 0<=f['beat']<=600000 or f['beat']<=previous or abs(f['x'])>POSITION_LIMIT or abs(f['y'])>POSITION_LIMIT or abs(f['angle'])>36000 or f.get('ease','linear') not in EASINGS:
+                raise ValueError('关键帧拍数需递增且非负；位移 ±1000（全屏为 100）、角度 ±36000，缓动类型必须有效')
             previous=f['beat']
 
 def pose(frames, beat):
@@ -36,6 +37,7 @@ def polygon(rect, frames, beat, aspect, events=None):
     if events:cx,cy,angle,width,height=transform(rect,frames,events,beat)
     else:
         l,t,r,b=rect;dx,dy,angle=pose(frames,beat);cx,cy,width,height=(l+r)/2+dx,(t+b)/2+dy,r-l,b-t
+    if width<=0 or height<=0:return []
     l,t,r,b=cx-width/2,cy-height/2,cx+width/2,cy+height/2
     dx=dy=0.;a=math.radians(angle);c=math.cos(a);s=math.sin(a)
     return [(cx+dx+(c*(x-cx)*aspect-s*(y-cy))/aspect,

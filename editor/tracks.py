@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 import math
 import re
 from bisect import bisect_right
+from versioning import POSITION_LIMIT
 from curves import Curve,validate_events
 
 @dataclass
@@ -82,8 +83,8 @@ def validate_tracks(lines):
         for f in line.frames:
             if not all(isinstance(f.get(k),(int,float)) and math.isfinite(f[k]) for k in ('beat','x','alpha')):
                 raise ValueError('轨迹关键帧需要有限数字')
-            if not 0<=f['beat']<=600000 or f['beat']<=last or not 0<=f['x']<=1 or not 0<=f['alpha']<=1 or f.get('ease','linear') not in ('linear','smooth','hold'):
-                raise ValueError('轨迹帧时间必须递增，位置和透明度在 0–1 之间')
+            if not 0<=f['beat']<=600000 or f['beat']<=last or not -POSITION_LIMIT<=f['x']<=POSITION_LIMIT or not 0<=f['alpha']<=1 or f.get('ease','linear') not in ('linear','smooth','hold'):
+                raise ValueError('轨迹帧时间必须递增，检查横向位置（±1000）及透明度（0–1）')
             last=f['beat']
         count+=len(line.frames)
         if not isinstance(line.events,dict) or set(line.events)-{'x','alpha','speed'}:raise ValueError('轨迹变化栏只能为位置、透明度、流速')

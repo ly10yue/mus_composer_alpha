@@ -10,7 +10,7 @@ from track_editor import TrackDialog,number
 from track_view import TrackTimeline
 from numeric import sync_number
 from views import Stage
-from versioning import display_factor,APP_VERSION
+from versioning import display_range,display_factor,APP_VERSION
 
 class RegionDialog(TrackDialog):
     PROPS=PROPS
@@ -106,7 +106,7 @@ class RegionDialog(TrackDialog):
         if valid:
             prop=selected[0];center=prop=='center';self.selection_label.setText(self.LABELS[self.PROPS.index(prop)])
             self.start.setValue(item['start']);self.end.setValue(item['end'])
-            low,high=(-200,300) if center else (-36000,36000) if prop=='angle' else (.1,400)
+            low,high=display_range(prop)
             for box in (self.value_from,self.value_to,self.from_y,self.to_y):box.setRange(low,high);box.setSingleStep(5 if prop=='angle' else 1)
             self.value_from.setValue((item['from'][0] if center else item['from'])*display_factor(prop));self.value_to.setValue((item['to'][0] if center else item['to'])*display_factor(prop))
             self.from_y.setEnabled(center);self.to_y.setEnabled(center)
